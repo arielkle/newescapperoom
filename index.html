@@ -3,45 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>חדר בריחה דיגיטלי - גרסת הענן</title>
+    <title>חדר בריחה דיגיטלי - גרסת ZIP</title>
     
-    <!-- ספריות עיצוב ופונטים -->
+    <!-- CSS ספריות -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'escape-room-v1';
-
-        window.db = db;
-        window.auth = auth;
-        window.appId = appId;
-        window.firestoreFuncs = { doc, setDoc, getDoc, collection };
-
-        // אתחול כניסה לפני שאילתות (כלל 3)
-        const initAuth = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                console.log("Authenticated successfully");
-            } catch (e) {
-                console.error("Auth failed", e);
-            }
-        };
-        initAuth();
-    </script>
+    <!-- JSZip ספריה ליצירת וקריאת קובצי ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         body { font-family: 'Assistant', sans-serif; background-color: #0b1120; color: #e2e8f0; overflow: hidden; }
@@ -58,7 +28,7 @@
         .hotspot-play:hover { border-color: rgba(6, 182, 212, 0.5); background: rgba(6, 182, 212, 0.1); }
         
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0b1120; }
+        ::-webkit-scrollbar-track { background: #0b1120; border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; }
 
         .image-display-area { position: relative; display: inline-block; max-width: 100%; }
@@ -75,50 +45,53 @@
     <!-- מסך טעינה -->
     <div id="loading-screen" class="hidden fixed inset-0 z-[1000] loading-overlay flex flex-col items-center justify-center">
         <div class="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p id="loading-text" class="theme-font text-cyan-400 tracking-widest uppercase text-center">מתקשר עם הענן...</p>
+        <p id="loading-text" class="theme-font text-cyan-400 tracking-widest uppercase text-center mt-4">טוען...</p>
     </div>
 
     <!-- מסך פתיחה -->
     <div id="screen-intro" class="flex-1 flex flex-col items-center justify-center p-6 bg-slate-950 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-[#0b1120]">
-        <i class="fas fa-cloud text-cyan-500 text-6xl mb-6 opacity-80"></i>
-        <h1 class="text-6xl font-black text-cyan-400 mb-2 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] theme-font text-center">חדר בריחה בענן</h1>
-        <p class="text-xl text-slate-400 mb-12 tracking-widest text-center">העלו GIFs ושחקו מיד</p>
+        <i class="fas fa-file-archive text-cyan-500 text-6xl mb-6 opacity-80"></i>
+        <h1 class="text-6xl font-black text-cyan-400 mb-2 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] theme-font text-center">חדר בריחה דיגיטלי</h1>
+        <p class="text-xl text-slate-400 mb-12 tracking-widest text-center">משחק אופליין באמצעות קובצי ZIP</p>
         
         <div class="grid md:grid-cols-2 gap-8 max-w-4xl w-full">
+            <!-- צד תלמיד -->
             <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-indigo-500 transition-colors shadow-2xl flex flex-col items-center text-center group">
                 <div class="w-20 h-20 bg-indigo-900 border border-indigo-500 rounded-full flex items-center justify-center mb-6 text-indigo-300">
-                    <i class="fas fa-key text-3xl"></i>
+                    <i class="fas fa-user-graduate text-3xl"></i>
                 </div>
                 <h2 class="text-3xl font-bold mb-4 z-10 text-indigo-100 text-center">אני תלמיד</h2>
                 <div class="w-full space-y-4">
-                    <input id="input-room-code" type="text" placeholder="הכנס קוד חדר" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-2xl theme-font text-indigo-300 uppercase focus:border-indigo-500 outline-none">
-                    <button onclick="loadRoomFromCloud()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold text-xl transition transform hover:scale-105 w-full shadow-lg">
-                        היכנס למשחק
-                    </button>
+                    <p class="text-slate-400 mb-4 text-sm text-center">העלו את קובץ ה-ZIP שקיבלתם מהמורה.</p>
+                    <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold text-xl cursor-pointer transition transform hover:scale-105 w-full block shadow-lg">
+                        טען משחק (.zip)
+                        <input type="file" class="hidden" accept=".zip" onchange="handleLoadZip(event, 'STUDENT')">
+                    </label>
                 </div>
             </div>
 
+            <!-- צד מורה -->
             <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-cyan-500 transition-colors shadow-2xl flex flex-col items-center text-center group text-cyan-300">
                 <div class="w-20 h-20 bg-cyan-900 border border-cyan-500 rounded-full flex items-center justify-center mb-6">
-                    <i class="fas fa-plus text-3xl text-cyan-300"></i>
+                    <i class="fas fa-chalkboard-teacher text-3xl text-cyan-300"></i>
                 </div>
                 <h2 class="text-3xl font-bold mb-4 z-10 text-cyan-100 text-center">אני מורה</h2>
                 <div class="flex flex-col gap-3 w-full">
                     <label class="bg-cyan-700 hover:bg-cyan-600 text-white px-8 py-4 rounded-xl font-bold text-xl cursor-pointer transition transform hover:scale-105 block shadow-lg text-center">
-                        יצירת חדר חדש (GIF)
-                        <input type="file" class="hidden" accept="image/gif" onchange="handleNewGame(event)">
+                        צור חדר חדש (GIF)
+                        <input type="file" class="hidden" accept="image/gif,image/jpeg,image/png" onchange="handleNewGame(event)">
                     </label>
-                    <p class="text-[10px] text-slate-500 uppercase mt-2">המשך עריכה עם קוד:</p>
-                    <div class="flex gap-2">
-                         <input id="input-edit-code" type="text" placeholder="קוד חדר" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-center text-sm theme-font uppercase outline-none">
-                         <button onclick="loadRoomForEdit()" class="bg-slate-800 px-4 py-2 rounded-lg text-xs font-bold border border-slate-600">ערוך</button>
-                    </div>
+                    <p class="text-[10px] text-slate-500 uppercase mt-2">המשך עריכת חדר קיים:</p>
+                    <label class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 px-8 py-3 rounded-xl font-bold cursor-pointer transition block text-center">
+                        פתח חדר מ-ZIP
+                        <input type="file" class="hidden" accept=".zip" onchange="handleLoadZip(event, 'TEACHER')">
+                    </label>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- מסך עריכה -->
+    <!-- מסך מורה -->
     <div id="screen-teacher" class="hidden flex-1 flex flex-col bg-[#0b1120] overflow-hidden h-screen">
         <header class="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center shadow-lg z-30 shrink-0">
             <h1 class="text-2xl font-bold text-cyan-400 theme-font flex items-center gap-2">
@@ -128,24 +101,26 @@
                 <button onclick="location.reload()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-sm">בית</button>
                 <div class="w-px h-6 bg-slate-700"></div>
                 <button onclick="previewGame()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">תצוגת תלמיד</button>
-                <button onclick="saveToCloud()" class="bg-cyan-700 hover:bg-cyan-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2">
-                    <i class="fas fa-cloud-upload-alt"></i> שמור בענן
+                <button onclick="saveToZip()" class="bg-cyan-700 hover:bg-cyan-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2">
+                    <i class="fas fa-download"></i> שמור כ-ZIP
                 </button>
             </div>
         </header>
 
         <div class="flex-1 flex overflow-hidden min-h-0">
-            <aside class="w-72 bg-slate-900 border-l border-slate-800 p-4 flex flex-col gap-4 z-20 shrink-0 h-full overflow-hidden text-center">
+            <!-- סרגל צד (תצוגת שקפים מימין) -->
+            <aside class="w-80 bg-slate-900 border-l border-slate-800 p-4 flex flex-col gap-4 z-20 shrink-0 h-full overflow-hidden text-center">
                 <div class="flex justify-between items-center mb-2 shrink-0">
-                    <h2 class="font-bold text-lg text-slate-300 uppercase tracking-widest text-sm">שלבי החדר</h2>
+                    <h2 class="font-bold text-lg text-slate-300 uppercase tracking-widest text-sm">שקפים</h2>
                     <label class="bg-cyan-700 hover:bg-cyan-600 border border-cyan-500 w-8 h-8 rounded-full cursor-pointer flex items-center justify-center text-white transition hover:scale-110">
                         <i class="fas fa-plus"></i>
-                        <input type="file" class="hidden" accept="image/gif" onchange="addLevelFromFile(event)">
+                        <input type="file" class="hidden" accept="image/gif,image/jpeg,image/png" onchange="addLevelFromFile(event)">
                     </label>
                 </div>
                 <div id="teacher-sidebar-levels" class="space-y-4 overflow-y-auto flex-1 pr-2 pb-10 min-h-0"></div>
             </aside>
 
+            <!-- אזור ראשי -->
             <main class="flex-1 overflow-y-auto p-4 bg-[#0b1120] flex flex-col items-center">
                 <div id="teacher-main-content" class="max-w-5xl mx-auto flex-1 flex flex-col items-center gap-4 w-full">
                     
@@ -161,8 +136,8 @@
                             <div id="teacher-hotspot" class="absolute hotspot-edit"></div>
                             
                             <label class="absolute top-4 left-4 z-50 bg-black/60 hover:bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold border border-white/20 text-white shadow-lg cursor-pointer transition flex items-center gap-2">
-                                <i class="fas fa-sync-alt"></i> החלפת GIF
-                                <input type="file" class="hidden" accept="image/gif" onchange="replaceImageFromFile(event)">
+                                <i class="fas fa-sync-alt"></i> החלף GIF
+                                <input type="file" class="hidden" accept="image/gif,image/jpeg,image/png" onchange="replaceImageFromFile(event)">
                             </label>
                         </div>
                     </div>
@@ -177,7 +152,7 @@
                             <input id="teacher-input-answer" type="text" class="bg-[#0b1120] border border-slate-700 rounded-lg px-4 py-2 text-cyan-300 h-full focus:ring-1 focus:ring-cyan-500 theme-font text-base">
                         </div>
                     </div>
-
+                    
                     <div id="teacher-nav-msg" class="hidden w-full bg-indigo-900/40 p-3 rounded-xl border border-indigo-700 text-center shadow-xl shrink-0 backdrop-blur-sm">
                         <p id="nav-msg-text" class="text-indigo-200 font-bold text-xs"></p>
                     </div>
@@ -188,10 +163,14 @@
 
     <!-- מסך תלמיד -->
     <div id="screen-student" class="hidden flex-1 flex flex-col bg-[#0b1120] overflow-hidden h-screen relative">
-        <header class="bg-slate-900/90 backdrop-blur-md p-4 border-b border-cyan-900/50 flex justify-between items-center z-30 shrink-0">
-            <h1 class="font-bold text-cyan-400 theme-font text-3xl tracking-widest flex items-center gap-3">חדר בריחה</h1>
+        <header class="bg-slate-900/90 backdrop-blur-md p-4 border-b border-cyan-900/50 flex justify-between items-center shadow-lg z-30 shrink-0">
+            <h1 class="font-bold text-cyan-400 theme-font text-3xl tracking-widest flex items-center gap-3">
+                <i class="fas fa-lock-open"></i> חדר בריחה
+            </h1>
             <div class="flex items-center gap-4">
-                <button id="btn-back-to-edit" onclick="returnToEditor()" class="hidden bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-300 px-4 py-1.5 rounded-lg text-xs">חזרה לעריכה</button>
+                <button id="btn-back-to-edit" onclick="returnToEditor()" class="hidden bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-300 px-4 py-1.5 rounded-lg text-xs">
+                    <i class="fas fa-arrow-right"></i> חזרה לעריכה
+                </button>
                 <div id="student-progress-text" class="text-cyan-100 font-bold bg-[#0b1120] border border-cyan-800 px-6 py-2 rounded-full text-sm shadow-lg"></div>
             </div>
         </header>
@@ -204,18 +183,7 @@
         </main>
     </div>
 
-    <!-- מודאל קוד חדר (מורה) -->
-    <div id="modal-code" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md text-center">
-        <div class="bg-slate-900 p-10 rounded-2xl border border-cyan-500 max-w-sm w-full">
-            <i class="fas fa-check-circle text-green-400 text-5xl mb-4"></i>
-            <h2 class="text-2xl font-bold mb-2">החדר נשמר בהצלחה!</h2>
-            <p class="text-slate-400 mb-6 text-sm">קוד החדר לתלמידים:</p>
-            <div id="display-room-code" class="text-6xl font-black text-cyan-400 theme-font mb-8 select-all tracking-widest">----</div>
-            <button onclick="document.getElementById('modal-code').classList.add('hidden')" class="bg-cyan-700 hover:bg-cyan-600 text-white w-full py-4 rounded-xl font-bold uppercase">הבנתי</button>
-        </div>
-    </div>
-
-    <!-- מודאל שאלה (תלמיד) -->
+    <!-- מודאל שאלות -->
     <div id="modal-lock" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
         <div class="bg-slate-900 p-8 rounded-2xl border border-cyan-800 max-w-md w-full text-center relative overflow-hidden">
             <h2 class="theme-font text-2xl font-bold text-cyan-400 mb-6 tracking-widest uppercase">הזנת קוד גישה</h2>
@@ -239,6 +207,7 @@
     </div>
 
     <script>
+        // --- לוגיקה פנימית ---
         let levels = [];
         let currentLevelIndex = 0;
         let isDragging = false;
@@ -281,140 +250,22 @@
             modalFeedback: document.getElementById('modal-feedback')
         };
 
+        // התראות
+        function customAlert(msg, isError = true) {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-10 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-xl shadow-2xl font-bold text-white z-[9999] transition-all duration-500 opacity-0 flex items-center gap-3 ${isError ? 'bg-red-600 border-2 border-red-400' : 'bg-green-600 border-2 border-green-400'}`;
+            toast.innerHTML = `<i class="fas ${isError ? 'fa-exclamation-triangle' : 'fa-check-circle'} text-xl"></i> <span>${msg}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.classList.replace('opacity-0', 'opacity-100'), 50);
+            setTimeout(() => {
+                toast.classList.replace('opacity-100', 'opacity-0');
+                setTimeout(() => toast.remove(), 500);
+            }, 4000);
+        }
+
         function showLoading(show, text = "טוען...") {
             document.getElementById('loading-text').innerText = text;
             screens.loading.classList.toggle('hidden', !show);
-        }
-
-        async function saveToCloud() {
-            if (levels.length === 0) return;
-            if (!window.auth.currentUser) {
-                alert("מערכת האימות עדיין נטענת. נסה שוב בעוד רגע.");
-                return;
-            }
-
-            showLoading(true, "שומר נתונים בענן (זה עשוי לקחת מספר שניות)...");
-            try {
-                const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-                const { doc, setDoc } = window.firestoreFuncs;
-                
-                const levelsWithoutImages = [];
-                const chunks = [];
-                const CHUNK_SIZE = 800000; // חלוקה למנות קטנות מ-1MB כדי למנוע קריסה
-
-                for (let i = 0; i < levels.length; i++) {
-                    const lvl = levels[i];
-                    const lvlCopy = { ...lvl, image: '' };
-                    levelsWithoutImages.push(lvlCopy);
-                    
-                    if (lvl.image) {
-                        const numChunks = Math.ceil(lvl.image.length / CHUNK_SIZE);
-                        lvlCopy.imageChunks = numChunks;
-                        
-                        for (let c = 0; c < numChunks; c++) {
-                            chunks.push({
-                                levelIdx: i,
-                                chunkIdx: c,
-                                data: lvl.image.substring(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE)
-                            });
-                        }
-                    } else {
-                        lvlCopy.imageChunks = 0;
-                    }
-                }
-
-                // 1. שמירת חלקי ה-GIF
-                for (let i = 0; i < chunks.length; i++) {
-                    const chunkRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'room_chunks', `${roomCode}_${chunks[i].levelIdx}_${chunks[i].chunkIdx}`);
-                    await setDoc(chunkRef, { data: chunks[i].data });
-                }
-
-                // 2. שמירת המבנה הראשי של החדר
-                const roomRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'rooms', roomCode);
-                await setDoc(roomRef, {
-                    levels: levelsWithoutImages,
-                    updatedAt: Date.now(),
-                    owner: window.auth.currentUser.uid
-                });
-
-                document.getElementById('display-room-code').innerText = roomCode;
-                document.getElementById('modal-code').classList.remove('hidden');
-            } catch (e) {
-                console.error(e);
-                alert("שגיאה בשמירה בענן: נא לוודא שהחיבור לאינטרנט יציב.");
-            }
-            showLoading(false);
-        }
-
-        async function fetchRoomData(code) {
-            const { doc, getDoc } = window.firestoreFuncs;
-            const roomRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'rooms', code);
-            const snap = await getDoc(roomRef);
-            if (!snap.exists()) return null;
-            
-            const data = snap.data();
-            const loadedLevels = data.levels;
-            
-            // שחזור התמונות מהחלקים שנשמרו בענן
-            for (let i = 0; i < loadedLevels.length; i++) {
-                const lvl = loadedLevels[i];
-                if (lvl.imageChunks > 0) {
-                    let fullImage = '';
-                    for (let c = 0; c < lvl.imageChunks; c++) {
-                        const chunkRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'room_chunks', `${code}_${i}_${c}`);
-                        const chunkSnap = await getDoc(chunkRef);
-                        if (chunkSnap.exists()) {
-                            fullImage += chunkSnap.data().data;
-                        }
-                    }
-                    lvl.image = fullImage;
-                }
-            }
-            return loadedLevels;
-        }
-
-        async function loadRoomFromCloud() {
-            const code = document.getElementById('input-room-code').value.trim().toUpperCase();
-            if (!code) return;
-            showLoading(true, "טוען חדר (טעינת GIF יכולה לקחת מעט זמן)...");
-            try {
-                const loadedLevels = await fetchRoomData(code);
-                if (loadedLevels) {
-                    levels = loadedLevels;
-                    currentLevelIndex = 0;
-                    userRole = 'STUDENT';
-                    showScreen('student');
-                    renderStudentUI();
-                } else {
-                    alert("קוד חדר לא תקין או לא נמצא.");
-                }
-            } catch (e) {
-                console.error(e);
-                alert("תקלת תקשורת מול הענן.");
-            }
-            showLoading(false);
-        }
-
-        async function loadRoomForEdit() {
-            const code = document.getElementById('input-edit-code').value.trim().toUpperCase();
-            if (!code) return;
-            showLoading(true, "טוען חדר לעריכה...");
-            try {
-                const loadedLevels = await fetchRoomData(code);
-                if (loadedLevels) {
-                    levels = loadedLevels;
-                    currentLevelIndex = 0;
-                    userRole = 'TEACHER';
-                    showScreen('teacher');
-                    renderTeacherUI();
-                } else {
-                    alert("חדר לא נמצא.");
-                }
-            } catch (e) {
-                console.error(e);
-                alert("תקלת תקשורת מול הענן.");
-            }
-            showLoading(false);
         }
 
         function showScreen(screenName) {
@@ -422,10 +273,141 @@
             if (screens[screenName]) screens[screenName].classList.remove('hidden');
         }
 
+        // --- ZIP לוגיקה ---
+        
+        // יצירת ZIP ושמירה מקומית
+        async function saveToZip() {
+            if (levels.length === 0) {
+                customAlert("לא ניתן לשמור חדר ריק", true);
+                return;
+            }
+
+            showLoading(true, "יוצר קובץ ZIP...");
+            await new Promise(r => setTimeout(r, 100)); // רענון UI
+
+            try {
+                const zip = new JSZip();
+                const configData = [];
+
+                for (let i = 0; i < levels.length; i++) {
+                    const lvl = levels[i];
+                    // השתמש בנתונים המקוריים ששמרנו
+                    const base64String = lvl.originalData || lvl.image; 
+                    
+                    // חילוץ הנתונים הנקיים של ה-Base64
+                    const commaIdx = base64String.indexOf(',');
+                    const base64Content = base64String.substring(commaIdx + 1);
+                    
+                    // מציאת סיומת הקובץ
+                    let extension = "gif"; // default
+                    const mimeMatch = base64String.match(/data:image\/(.+?);/);
+                    if (mimeMatch && mimeMatch[1]) {
+                        extension = mimeMatch[1];
+                    }
+
+                    const fileName = `image_${i}.${extension}`;
+                    
+                    // הוספת התמונה ל-ZIP
+                    zip.file(fileName, base64Content, {base64: true});
+
+                    // בניית קובץ הקונפיגורציה
+                    configData.push({
+                        id: lvl.id,
+                        type: lvl.type,
+                        question: lvl.question,
+                        answer: lvl.answer,
+                        hotspot: lvl.hotspot,
+                        imageFile: fileName // הפניה לשם התמונה ב-ZIP
+                    });
+                }
+
+                // הוספת קובץ JSON ל-ZIP
+                zip.file("config.json", JSON.stringify(configData));
+
+                // יצירת קובץ ZIP והורדה
+                const zipContent = await zip.generateAsync({type:"blob"});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipContent);
+                link.download = 'escape_room_game.zip';
+                link.click();
+                
+                customAlert("בהצלחה! קובץ המשחק נשמר.", false);
+            } catch (e) {
+                console.error(e);
+                customAlert("שגיאה ביצירת הקובץ.", true);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // טעינת ZIP מסטודענט או לערער
+        async function handleLoadZip(event, role) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            showLoading(true, "קורא את קובץ ה-ZIP...");
+            
+            try {
+                const zip = new JSZip();
+                const zipContents = await zip.loadAsync(file);
+                
+                // חיפוש קובץ קונפיגורציה
+                const configFile = zipContents.file("config.json");
+                if (!configFile) {
+                    throw new Error("לא נמצא קובץ config.json");
+                }
+                
+                const configText = await configFile.async("string");
+                const configData = JSON.parse(configText);
+                
+                // יצירת Object URLs לתמונות מה-ZIP (מניעת שימוש ב-Base64 ב-DOM)
+                levels = [];
+                for (let i = 0; i < configData.length; i++) {
+                    const item = configData[i];
+                    const imgFile = zipContents.file(item.imageFile);
+                    
+                    if (imgFile) {
+                        const imgBlob = await imgFile.async("blob");
+                        const blobUrl = URL.createObjectURL(imgBlob); 
+                        item.image = blobUrl;
+                        item.preview = blobUrl; // שימוש ב-Blob כברירת מחדל לתצוגה
+                        
+                        // למורים, אנחנו צריכים לשמור גם את המקור כדי שיוכלו לשמור מחדש
+                        if (role === 'TEACHER') {
+                            const base64 = await imgFile.async("base64");
+                            item.originalData = `data:${imgBlob.type};base64,${base64}`;
+                        }
+                    }
+                    levels.push(item);
+                }
+
+                currentLevelIndex = 0;
+                userRole = role;
+                
+                if(role === 'TEACHER') { 
+                    showScreen('teacher'); 
+                    renderTeacherUI(); 
+                } else { 
+                    showScreen('student'); 
+                    renderStudentUI(); 
+                }
+                
+                customAlert("המשחק נטען בהצלחה", false);
+            } catch (err) {
+                console.error(err);
+                customAlert("שגיאה. קובץ ZIP פגום.", true);
+            } finally {
+                event.target.value = '';
+                showLoading(false);
+            }
+        }
+
+        // --- ניהול לוגיקה עבור המורה ---
+
         async function processFile(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
+                reader.onload = (e) => resolve(e.target.result); // Base64
                 reader.readAsDataURL(file);
             });
         }
@@ -433,15 +415,21 @@
         async function handleNewGame(event) {
             const file = event.target.files[0];
             if (!file) return;
-            showLoading(true, "מעבד GIF...");
+            showLoading(true, "מעבד קובץ...");
+            await new Promise(r => setTimeout(r, 50));
+            
             userRole = 'TEACHER';
             levels = [];
             const imgData = await processFile(file);
+            const previewUrl = URL.createObjectURL(file); // יצירת URL מהיר לתצוגה המקדימה
+            
             levels.push({
                 id: Date.now(),
                 image: imgData,
-                type: 'puzzle',
-                question: 'מהו הקוד?',
+                originalData: imgData,
+                preview: previewUrl, 
+                type: 'intro',
+                question: '',
                 answer: '',
                 hotspot: { x: 40, y: 40, width: 20, height: 20 }
             });
@@ -449,16 +437,23 @@
             showScreen('teacher');
             renderTeacherUI();
             showLoading(false);
+            event.target.value = '';
         }
 
         async function addLevelFromFile(event) {
             const file = event.target.files[0];
             if (!file) return;
-            showLoading(true, "מוסיף שלב...");
+            showLoading(true, "מוסיף תמונה...");
+            await new Promise(r => setTimeout(r, 50));
+            
             const imgData = await processFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            
             const newLevel = {
                 id: Date.now(),
                 image: imgData,
+                originalData: imgData,
+                preview: previewUrl,
                 type: 'puzzle',
                 question: 'מהו הקוד?',
                 answer: '',
@@ -468,16 +463,25 @@
             currentLevelIndex++;
             renderTeacherUI();
             showLoading(false);
+            event.target.value = '';
         }
 
         async function replaceImageFromFile(event) {
             const file = event.target.files[0];
             if (!file) return;
             showLoading(true, "מחליף תמונה...");
+            await new Promise(r => setTimeout(r, 50));
+            
             const imgData = await processFile(file);
+            const previewUrl = URL.createObjectURL(file);
+            
             levels[currentLevelIndex].image = imgData;
+            levels[currentLevelIndex].originalData = imgData;
+            levels[currentLevelIndex].preview = previewUrl;
+            
             renderTeacherUI();
             showLoading(false);
+            event.target.value = '';
         }
 
         function setLevelType(type) {
@@ -489,28 +493,33 @@
         function renderTeacherUI() {
             if (levels.length === 0) {
                 teacherDOM.mainContent.style.visibility = 'hidden';
-                teacherDOM.sidebar.innerHTML = '<p class="text-slate-500 text-center text-sm mt-10">אין שלבים</p>';
+                teacherDOM.sidebar.innerHTML = '<p class="text-slate-500 text-center text-sm mt-10">אין שקפים</p>';
                 return;
             }
             teacherDOM.mainContent.style.visibility = 'visible';
             
-            // רינדור הסיידבר
             teacherDOM.sidebar.innerHTML = '';
             levels.forEach((lvl, idx) => {
                 const div = document.createElement('div');
-                div.className = `group relative p-2 rounded-xl border border-slate-700 cursor-pointer transition-all ${currentLevelIndex === idx ? 'active-level' : 'bg-slate-800'}`;
+                div.className = `group relative p-2 rounded-xl border-2 cursor-pointer transition-all ${currentLevelIndex === idx ? 'active-level border-cyan-400' : 'bg-slate-800 border-slate-700'}`;
                 div.onclick = () => { currentLevelIndex = idx; renderTeacherUI(); };
+                
+                // שימוש ב-Blob URL (preview) כדי למנוע קריסה בתצוגה המקדימה ולהראות תמיד את התמונה
+                const imgSrc = lvl.preview || lvl.image;
+                
                 div.innerHTML = `
-                    <div class="w-full h-16 bg-center bg-cover bg-no-repeat rounded-md mb-1 bg-black" style="background-image: url('${lvl.image.substring(0, 1000)}')"></div>
-                    <div class="text-[10px] font-bold text-center uppercase">שלב ${idx + 1}</div>
-                    <button onclick="event.stopPropagation(); removeLevel(${idx})" class="absolute top-2 left-2 bg-red-600/80 p-1.5 rounded opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-xs text-white"></i></button>`;
+                    <div class="w-full h-24 bg-center bg-cover bg-no-repeat rounded-md mb-2 bg-black shadow-inner border border-slate-600" style="background-image: url('${imgSrc}')">
+                    </div>
+                    <div class="text-[12px] font-bold text-center uppercase text-slate-300">שקף ${idx + 1}</div>
+                    <button onclick="event.stopPropagation(); removeLevel(${idx})" class="absolute top-3 left-3 bg-red-600/80 p-1.5 rounded opacity-0 group-hover:opacity-100 transition hover:scale-110 shadow-lg"><i class="fas fa-trash text-xs text-white"></i></button>`;
                 teacherDOM.sidebar.appendChild(div);
             });
 
             const current = levels[currentLevelIndex];
-            if (teacherDOM.img.src !== current.image) teacherDOM.img.src = current.image;
+            if (teacherDOM.img.src !== (current.preview || current.image)) {
+                teacherDOM.img.src = (current.preview || current.image);
+            }
             
-            // עדכון כפתורי הסוג
             Object.keys(teacherDOM.typeBtns).forEach(key => {
                 if(teacherDOM.typeBtns[key]) teacherDOM.typeBtns[key].classList.remove('active');
             });
@@ -527,9 +536,17 @@
             } else {
                 teacherDOM.editPanel.classList.add('hidden');
                 teacherDOM.navMsg.classList.remove('hidden');
-                teacherDOM.navText.innerHTML = currentType === 'intro' ? "תמונת פתיחה - סמנו אזור שקוף למעבר" : "תמונת סיום - סמנו אזור שקוף לסגירה";
+                teacherDOM.navText.innerHTML = currentType === 'intro' ? "סמנו אזור שקוף למעבר לשקף הבא" : "סמנו אזור שקוף לסיום המשחק";
             }
         }
+
+        function removeLevel(index) {
+            levels.splice(index, 1);
+            if (currentLevelIndex >= levels.length && levels.length > 0) currentLevelIndex = levels.length - 1;
+            renderTeacherUI();
+        }
+
+        // --- לוגיקת משחק (תלמיד) ---
 
         function handleImageClick() {
             const level = levels[currentLevelIndex];
@@ -558,10 +575,10 @@
             const puzzleCount = levels.filter(l => l.type === 'puzzle').length;
             const currentPuzzleIdx = levels.slice(0, currentLevelIndex + 1).filter(l => l.type === 'puzzle').length;
 
-            studentDOM.progress.innerText = (current.type === 'puzzle') ? `חידה ${currentPuzzleIdx} / ${puzzleCount}` : (current.type === 'intro' ? 'פתיחה' : 'סיום');
+            studentDOM.progress.innerText = (current.type === 'puzzle') ? `חידה ${currentPuzzleIdx} מתוך ${puzzleCount}` : (current.type === 'intro' ? 'פתיחה' : 'סיום');
             studentDOM.hint.innerText = (current.type === 'puzzle') ? "מצאו את המנעול בתוך ה-GIF ולחצו עליו" : "לחצו על האזור השקוף להמשך";
             
-            studentDOM.img.src = current.image;
+            studentDOM.img.src = current.preview || current.image;
             updateHotspotVisual(studentDOM.hotspot, current.hotspot);
         }
 
@@ -602,6 +619,7 @@
             const input = studentDOM.modalInput.value.trim().toLowerCase();
             const correct = (current.answer || "").trim().toLowerCase();
             const fb = studentDOM.modalFeedback;
+            
             if (input === correct || (correct.length > 2 && input.includes(correct))) {
                 fb.innerText = "נכון! המנעול נפתח.";
                 fb.className = "mt-2 text-green-400 block font-bold";
@@ -618,12 +636,6 @@
                 studentDOM.modalInput.classList.add('animate-shake');
                 setTimeout(() => studentDOM.modalInput.classList.remove('animate-shake'), 500);
             }
-        }
-
-        function removeLevel(index) {
-            levels.splice(index, 1);
-            if (currentLevelIndex >= levels.length && levels.length > 0) currentLevelIndex = levels.length - 1;
-            renderTeacherUI();
         }
 
         function previewGame() {
