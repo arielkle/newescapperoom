@@ -32,7 +32,10 @@
         ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; }
 
         .image-display-area { position: relative; display: inline-block; max-width: 100%; }
-        #teacher-image, #student-image { max-width: 100%; max-height: calc(100vh - 380px); object-fit: contain; display: block; background: #000; }
+        
+        /* הפרדה בין תצוגת מורה לתצוגת תלמיד - התלמיד מקבל מסך כמעט מלא */
+        #teacher-image { max-width: 100%; max-height: calc(100vh - 380px); object-fit: contain; display: block; background: #000; }
+        #student-image { max-width: 98vw; max-height: calc(100vh - 120px); object-fit: contain; display: block; background: #000; }
 
         .type-pill { transition: all 0.2s; cursor: pointer; border: 1px solid #334155; opacity: 0.6; }
         .type-pill.active { opacity: 1; border-color: #06b6d4; background-color: rgba(6, 182, 212, 0.1); }
@@ -163,23 +166,23 @@
 
     <!-- מסך תלמיד -->
     <div id="screen-student" class="hidden flex-1 flex flex-col bg-[#0b1120] overflow-hidden h-screen relative">
-        <header class="bg-slate-900/90 backdrop-blur-md p-4 border-b border-cyan-900/50 flex justify-between items-center shadow-lg z-30 shrink-0">
-            <h1 class="font-bold text-cyan-400 theme-font text-3xl tracking-widest flex items-center gap-3">
+        <header class="bg-slate-900/90 backdrop-blur-md py-2 px-4 border-b border-cyan-900/50 flex justify-between items-center shadow-lg z-30 shrink-0">
+            <h1 class="font-bold text-cyan-400 theme-font text-2xl tracking-widest flex items-center gap-3">
                 <i class="fas fa-lock-open"></i> חדר בריחה
             </h1>
             <div class="flex items-center gap-4">
                 <button id="btn-back-to-edit" onclick="returnToEditor()" class="hidden bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-300 px-4 py-1.5 rounded-lg text-xs">
                     <i class="fas fa-arrow-right"></i> חזרה לעריכה
                 </button>
-                <div id="student-progress-text" class="text-cyan-100 font-bold bg-[#0b1120] border border-cyan-800 px-6 py-2 rounded-full text-sm shadow-lg"></div>
+                <div id="student-progress-text" class="text-cyan-100 font-bold bg-[#0b1120] border border-cyan-800 px-4 py-1.5 rounded-full text-sm shadow-lg"></div>
             </div>
         </header>
-        <main class="flex-1 overflow-hidden p-4 md:p-8 flex flex-col items-center justify-center relative z-10 text-center">
+        <main class="flex-1 overflow-hidden p-2 flex flex-col items-center justify-center relative z-10 text-center">
             <div class="image-display-area group">
                 <img id="student-image" src="" draggable="false" class="shadow-[0_0_50px_rgba(0,0,0,0.9)] border-2 border-slate-700 rounded-xl select-none pointer-events-none">
                 <div id="student-hotspot" class="absolute hotspot-play" onclick="handleImageClick()"></div>
             </div>
-            <div id="student-hint-text" class="mt-8 text-slate-500 theme-font text-xs tracking-widest uppercase text-center opacity-60"></div>
+            <div id="student-hint-text" class="mt-3 text-slate-500 theme-font text-xs tracking-widest uppercase text-center opacity-60"></div>
         </main>
     </div>
 
