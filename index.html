@@ -3,12 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>חדר בריחה דיגיטלי - פלטפורמת קישורים</title>
+    <title>חדר בריחה דיגיטלי - גרסת הענן</title>
     
     <!-- ספריות עיצוב ופונטים -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'escape-room-v1';
+
+        window.db = db;
+        window.auth = auth;
+        window.appId = appId;
+        window.firestoreFuncs = { doc, setDoc, getDoc, collection };
+
+        // אתחול כניסה לפני שאילתות (כלל 3)
+        const initAuth = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Authenticated successfully");
+            } catch (e) {
+                console.error("Auth failed", e);
+            }
+        };
+        initAuth();
+    </script>
 
     <style>
         body { font-family: 'Assistant', sans-serif; background-color: #0b1120; color: #e2e8f0; overflow: hidden; }
@@ -18,81 +51,68 @@
         .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
         
         @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); } }
-        .active-level { border-color: #06b6d4; background-color: #1e293b; animation: pulse-border 2s infinite; }
+        .active-level { border-color: #06b6d4 !important; background-color: #1e293b !important; animation: pulse-border 2s infinite; }
 
         .hotspot-edit { border: 3px solid #06b6d4; background: rgba(6, 182, 212, 0.2); box-shadow: 0 0 10px rgba(6,182,212,0.5); z-index: 10; cursor: crosshair; pointer-events: none; }
         .hotspot-play { border: 3px solid transparent; z-index: 10; cursor: pointer; transition: all 0.3s; }
         .hotspot-play:hover { border-color: rgba(6, 182, 212, 0.5); background: rgba(6, 182, 212, 0.1); }
         
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0b1120; border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: #0b1120; }
         ::-webkit-scrollbar-thumb { background: #0ea5e9; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #0284c7; }
 
-        .image-display-area {
-            position: relative;
-            display: inline-block; 
-            max-width: 100%;
-        }
-        
-        #teacher-image, #student-image {
-            max-width: 100%;
-            max-height: calc(100vh - 380px); 
-            object-fit: contain;
-            display: block;
-            background: #000;
-        }
+        .image-display-area { position: relative; display: inline-block; max-width: 100%; }
+        #teacher-image, #student-image { max-width: 100%; max-height: calc(100vh - 380px); object-fit: contain; display: block; background: #000; }
 
         .type-pill { transition: all 0.2s; cursor: pointer; border: 1px solid #334155; opacity: 0.6; }
         .type-pill.active { opacity: 1; border-color: #06b6d4; background-color: rgba(6, 182, 212, 0.1); }
 
-        .loading-spinner {
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #06b6d4;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .loading-overlay { background: rgba(11, 17, 32, 0.9); backdrop-blur: 10px; }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col overflow-hidden text-white">
 
+    <!-- מסך טעינה -->
+    <div id="loading-screen" class="hidden fixed inset-0 z-[1000] loading-overlay flex flex-col items-center justify-center">
+        <div class="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p id="loading-text" class="theme-font text-cyan-400 tracking-widest uppercase text-center">מתקשר עם הענן...</p>
+    </div>
+
     <!-- מסך פתיחה -->
     <div id="screen-intro" class="flex-1 flex flex-col items-center justify-center p-6 bg-slate-950 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-[#0b1120]">
-        <i class="fas fa-link text-cyan-500 text-6xl mb-6 opacity-80"></i>
-        <h1 class="text-6xl font-black text-cyan-400 mb-2 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] theme-font text-center">חדר בריחה ענן</h1>
-        <p class="text-xl text-slate-400 mb-12 tracking-widest text-center">חוויה מהירה מבוססת קישורי Google Drive</p>
+        <i class="fas fa-cloud text-cyan-500 text-6xl mb-6 opacity-80"></i>
+        <h1 class="text-6xl font-black text-cyan-400 mb-2 drop-shadow-[0_0_15px_rgba(6,182,212,0.5)] theme-font text-center">חדר בריחה בענן</h1>
+        <p class="text-xl text-slate-400 mb-12 tracking-widest text-center">העלו GIFs ושחקו מיד</p>
         
         <div class="grid md:grid-cols-2 gap-8 max-w-4xl w-full">
-            <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-indigo-500 transition-colors shadow-2xl flex flex-col items-center text-center relative overflow-hidden group">
-                <div class="absolute inset-0 bg-indigo-500/5 group-hover:bg-indigo-500/10 transition-colors"></div>
-                <div class="w-20 h-20 bg-indigo-900 border border-indigo-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(99,102,241,0.5)] z-10 text-indigo-300">
-                    <i class="fas fa-play text-3xl"></i>
+            <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-indigo-500 transition-colors shadow-2xl flex flex-col items-center text-center group">
+                <div class="w-20 h-20 bg-indigo-900 border border-indigo-500 rounded-full flex items-center justify-center mb-6 text-indigo-300">
+                    <i class="fas fa-key text-3xl"></i>
                 </div>
                 <h2 class="text-3xl font-bold mb-4 z-10 text-indigo-100 text-center">אני תלמיד</h2>
-                <p class="text-slate-400 mb-8 z-10 text-sm text-center">העלו את קובץ המשחק הקטן (JSON) שקיבלתם.</p>
-                <label class="bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-white px-8 py-4 rounded-xl font-bold text-xl cursor-pointer transition transform hover:scale-105 w-full block z-10 shadow-lg text-center">
-                    טען משחק והתחל
-                    <input type="file" class="hidden" accept=".json" onchange="handleLoadGame(event, 'STUDENT')">
-                </label>
+                <div class="w-full space-y-4">
+                    <input id="input-room-code" type="text" placeholder="הכנס קוד חדר" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-2xl theme-font text-indigo-300 uppercase focus:border-indigo-500 outline-none">
+                    <button onclick="loadRoomFromCloud()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-bold text-xl transition transform hover:scale-105 w-full shadow-lg">
+                        היכנס למשחק
+                    </button>
+                </div>
             </div>
 
-            <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-cyan-500 transition-colors shadow-2xl flex flex-col items-center text-center relative overflow-hidden group text-cyan-300">
-                <div class="absolute inset-0 bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors"></div>
-                <div class="w-20 h-20 bg-cyan-900 border border-cyan-500 rounded-full flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(6,182,212,0.5)] z-10">
-                    <i class="fas fa-tools text-3xl text-cyan-300"></i>
+            <div class="bg-slate-900 rounded-3xl p-8 border border-slate-700 hover:border-cyan-500 transition-colors shadow-2xl flex flex-col items-center text-center group text-cyan-300">
+                <div class="w-20 h-20 bg-cyan-900 border border-cyan-500 rounded-full flex items-center justify-center mb-6">
+                    <i class="fas fa-plus text-3xl text-cyan-300"></i>
                 </div>
                 <h2 class="text-3xl font-bold mb-4 z-10 text-cyan-100 text-center">אני מורה</h2>
-                <div class="flex flex-col gap-3 w-full z-10 text-center">
-                    <button onclick="createNewGame()" class="bg-cyan-700 hover:bg-cyan-600 border border-cyan-500 text-white px-8 py-4 rounded-xl font-bold text-xl cursor-pointer transition transform hover:scale-105 block shadow-lg text-center">
-                        יצירת חדר חדש
-                    </button>
-                    <label class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-cyan-300 px-8 py-3 rounded-xl font-bold cursor-pointer transition block text-center">
-                        המשך עריכה (JSON)
-                        <input type="file" class="hidden" accept=".json" onchange="handleLoadGame(event, 'TEACHER')">
+                <div class="flex flex-col gap-3 w-full">
+                    <label class="bg-cyan-700 hover:bg-cyan-600 text-white px-8 py-4 rounded-xl font-bold text-xl cursor-pointer transition transform hover:scale-105 block shadow-lg text-center">
+                        יצירת חדר חדש (GIF)
+                        <input type="file" class="hidden" accept="image/gif" onchange="handleNewGame(event)">
                     </label>
+                    <p class="text-[10px] text-slate-500 uppercase mt-2">המשך עריכה עם קוד:</p>
+                    <div class="flex gap-2">
+                         <input id="input-edit-code" type="text" placeholder="קוד חדר" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-center text-sm theme-font uppercase outline-none">
+                         <button onclick="loadRoomForEdit()" class="bg-slate-800 px-4 py-2 rounded-lg text-xs font-bold border border-slate-600">ערוך</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -101,19 +121,15 @@
     <!-- מסך עריכה -->
     <div id="screen-teacher" class="hidden flex-1 flex flex-col bg-[#0b1120] overflow-hidden h-screen">
         <header class="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center shadow-lg z-30 shrink-0">
-            <h1 class="text-2xl font-bold text-cyan-400 theme-font flex items-center gap-3">
-                <i class="fas fa-cloud text-cyan-600"></i> עורך ענן
+            <h1 class="text-2xl font-bold text-cyan-400 theme-font flex items-center gap-2">
+                <i class="fas fa-edit"></i> עורך חדר בריחה
             </h1>
             <div class="flex gap-3 items-center">
-                <button onclick="location.reload()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-2 rounded-lg transition text-sm shadow-md">
-                    <i class="fas fa-home"></i> בית
-                </button>
+                <button onclick="location.reload()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-sm">בית</button>
                 <div class="w-px h-6 bg-slate-700"></div>
-                <button onclick="previewGame()" class="bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-white px-4 py-2 rounded-lg transition text-sm shadow-md">
-                    <i class="fas fa-play"></i> תצוגת תלמיד
-                </button>
-                <button onclick="saveProjectFile()" class="bg-cyan-700 hover:bg-cyan-600 border border-cyan-500 text-white px-6 py-2 rounded-lg transition text-sm font-bold shadow-lg">
-                    <i class="fas fa-save"></i> שמירה
+                <button onclick="previewGame()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">תצוגת תלמיד</button>
+                <button onclick="saveToCloud()" class="bg-cyan-700 hover:bg-cyan-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2">
+                    <i class="fas fa-cloud-upload-alt"></i> שמור בענן
                 </button>
             </div>
         </header>
@@ -122,49 +138,46 @@
             <aside class="w-72 bg-slate-900 border-l border-slate-800 p-4 flex flex-col gap-4 z-20 shrink-0 h-full overflow-hidden text-center">
                 <div class="flex justify-between items-center mb-2 shrink-0">
                     <h2 class="font-bold text-lg text-slate-300 uppercase tracking-widest text-sm">שלבי החדר</h2>
-                    <button onclick="addNewLevelPrompt()" class="bg-cyan-700 hover:bg-cyan-600 border border-cyan-500 w-8 h-8 rounded-full cursor-pointer flex items-center justify-center text-white transition hover:scale-110">
+                    <label class="bg-cyan-700 hover:bg-cyan-600 border border-cyan-500 w-8 h-8 rounded-full cursor-pointer flex items-center justify-center text-white transition hover:scale-110">
                         <i class="fas fa-plus"></i>
-                    </button>
+                        <input type="file" class="hidden" accept="image/gif" onchange="addLevelFromFile(event)">
+                    </label>
                 </div>
                 <div id="teacher-sidebar-levels" class="space-y-4 overflow-y-auto flex-1 pr-2 pb-10 min-h-0"></div>
             </aside>
 
-            <main class="flex-1 overflow-y-auto p-4 bg-[#0b1120] shadow-inner flex flex-col items-center">
+            <main class="flex-1 overflow-y-auto p-4 bg-[#0b1120] flex flex-col items-center">
                 <div id="teacher-main-content" class="max-w-5xl mx-auto flex-1 flex flex-col items-center gap-4 w-full">
                     
-                    <!-- הזנת קישור לתמונה/גיף -->
-                    <div class="w-full bg-slate-900/80 p-4 rounded-xl border border-slate-700 shadow-xl shrink-0">
-                        <label class="text-[10px] font-bold text-cyan-500 uppercase flex items-center gap-2 mb-2">קישור ל-GIF (גוגל דרייב או כתובת ישירה):</label>
-                        <div class="flex gap-2">
-                            <input id="teacher-input-url" type="text" class="flex-1 bg-[#0b1120] border border-slate-700 rounded-lg px-4 py-2 text-cyan-300 focus:ring-1 focus:ring-cyan-500 outline-none" placeholder="הדביקו קישור כאן...">
-                            <button onclick="updateImageFromUrl()" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg text-xs font-bold border border-slate-600">עדכן תמונה</button>
-                        </div>
-                    </div>
-
                     <div id="teacher-type-selector" class="w-full flex justify-center gap-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800 shrink-0">
-                        <div onclick="setLevelType('intro')" id="type-intro" class="type-pill px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">תמונת פתיחה</div>
-                        <div onclick="setLevelType('puzzle')" id="type-puzzle" class="type-pill px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">חידת קוד</div>
-                        <div onclick="setLevelType('end')" id="type-end" class="type-pill px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">תמונת סיום</div>
+                        <button onclick="setLevelType('intro')" id="type-btn-intro" class="type-pill px-4 py-2 rounded-xl text-sm font-bold">תמונת פתיחה</button>
+                        <button onclick="setLevelType('puzzle')" id="type-btn-puzzle" class="type-pill px-4 py-2 rounded-xl text-sm font-bold">חידת קוד</button>
+                        <button onclick="setLevelType('end')" id="type-btn-end" class="type-pill px-4 py-2 rounded-xl text-sm font-bold">תמונת סיום</button>
                     </div>
 
                     <div class="flex-1 flex items-center justify-center w-full bg-black/40 rounded-xl overflow-visible">
                         <div id="teacher-image-wrapper" class="image-display-area shadow-2xl" onmousedown="startHotspotDraw(event)" onmousemove="updateHotspotDraw(event)">
-                            <img id="teacher-image" src="" draggable="false" class="opacity-95 pointer-events-none select-none" onerror="this.src='https://placehold.co/600x400/0b1120/06b6d4?text=No+Image+Found'">
+                            <img id="teacher-image" src="" draggable="false" class="opacity-95 pointer-events-none select-none">
                             <div id="teacher-hotspot" class="absolute hotspot-edit"></div>
+                            
+                            <label class="absolute top-4 left-4 z-50 bg-black/60 hover:bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold border border-white/20 text-white shadow-lg cursor-pointer transition flex items-center gap-2">
+                                <i class="fas fa-sync-alt"></i> החלפת GIF
+                                <input type="file" class="hidden" accept="image/gif" onchange="replaceImageFromFile(event)">
+                            </label>
                         </div>
                     </div>
 
                     <div id="teacher-edit-panel" class="w-full bg-slate-900/80 p-5 rounded-xl border border-slate-700 grid grid-cols-2 gap-4 shadow-xl shrink-0 backdrop-blur-sm">
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-cyan-500 uppercase">שאלה:</label>
+                            <label class="text-[10px] font-bold text-cyan-500 uppercase">שאלה לתלמיד:</label>
                             <textarea id="teacher-input-question" rows="2" class="bg-[#0b1120] border border-slate-700 rounded-lg px-4 py-2 text-slate-200 focus:outline-none resize-none text-sm"></textarea>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <label class="text-[10px] font-bold text-cyan-500 uppercase">תשובה:</label>
+                            <label class="text-[10px] font-bold text-cyan-500 uppercase">קוד הפתרון:</label>
                             <input id="teacher-input-answer" type="text" class="bg-[#0b1120] border border-slate-700 rounded-lg px-4 py-2 text-cyan-300 h-full focus:ring-1 focus:ring-cyan-500 theme-font text-base">
                         </div>
                     </div>
-                    
+
                     <div id="teacher-nav-msg" class="hidden w-full bg-indigo-900/40 p-3 rounded-xl border border-indigo-700 text-center shadow-xl shrink-0 backdrop-blur-sm">
                         <p id="nav-msg-text" class="text-indigo-200 font-bold text-xs"></p>
                     </div>
@@ -175,18 +188,13 @@
 
     <!-- מסך תלמיד -->
     <div id="screen-student" class="hidden flex-1 flex flex-col bg-[#0b1120] overflow-hidden h-screen relative">
-        <header class="bg-slate-900/90 backdrop-blur-md p-4 border-b border-cyan-900/50 flex justify-between items-center shadow-lg z-30 shrink-0">
-            <h1 class="font-bold text-cyan-400 theme-font text-3xl tracking-widest flex items-center gap-3">
-                <i class="fas fa-lock-open"></i> חדר בריחה
-            </h1>
+        <header class="bg-slate-900/90 backdrop-blur-md p-4 border-b border-cyan-900/50 flex justify-between items-center z-30 shrink-0">
+            <h1 class="font-bold text-cyan-400 theme-font text-3xl tracking-widest flex items-center gap-3">חדר בריחה</h1>
             <div class="flex items-center gap-4">
-                <button id="btn-back-to-edit" onclick="returnToEditor()" class="hidden bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-300 px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm">
-                    <i class="fas fa-arrow-right"></i> חזרה לעריכה
-                </button>
-                <div id="student-progress-text" class="text-cyan-100 font-bold bg-[#0b1120] border border-cyan-800 px-6 py-2 rounded-full text-sm tracking-wide shadow-lg"></div>
+                <button id="btn-back-to-edit" onclick="returnToEditor()" class="hidden bg-slate-800 hover:bg-slate-700 border border-slate-500 text-slate-300 px-4 py-1.5 rounded-lg text-xs">חזרה לעריכה</button>
+                <div id="student-progress-text" class="text-cyan-100 font-bold bg-[#0b1120] border border-cyan-800 px-6 py-2 rounded-full text-sm shadow-lg"></div>
             </div>
         </header>
-
         <main class="flex-1 overflow-hidden p-4 md:p-8 flex flex-col items-center justify-center relative z-10 text-center">
             <div class="image-display-area group">
                 <img id="student-image" src="" draggable="false" class="shadow-[0_0_50px_rgba(0,0,0,0.9)] border-2 border-slate-700 rounded-xl select-none pointer-events-none">
@@ -196,15 +204,25 @@
         </main>
     </div>
 
-    <!-- מודאל שאלה -->
+    <!-- מודאל קוד חדר (מורה) -->
+    <div id="modal-code" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md text-center">
+        <div class="bg-slate-900 p-10 rounded-2xl border border-cyan-500 max-w-sm w-full">
+            <i class="fas fa-check-circle text-green-400 text-5xl mb-4"></i>
+            <h2 class="text-2xl font-bold mb-2">החדר נשמר בהצלחה!</h2>
+            <p class="text-slate-400 mb-6 text-sm">קוד החדר לתלמידים:</p>
+            <div id="display-room-code" class="text-6xl font-black text-cyan-400 theme-font mb-8 select-all tracking-widest">----</div>
+            <button onclick="document.getElementById('modal-code').classList.add('hidden')" class="bg-cyan-700 hover:bg-cyan-600 text-white w-full py-4 rounded-xl font-bold uppercase">הבנתי</button>
+        </div>
+    </div>
+
+    <!-- מודאל שאלה (תלמיד) -->
     <div id="modal-lock" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
         <div class="bg-slate-900 p-8 rounded-2xl border border-cyan-800 max-w-md w-full text-center relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,1)]"></div>
             <h2 class="theme-font text-2xl font-bold text-cyan-400 mb-6 tracking-widest uppercase">הזנת קוד גישה</h2>
             <p id="modal-question" class="text-lg mb-8 leading-relaxed text-slate-300 bg-slate-800/50 p-6 rounded-lg border border-slate-700"></p>
             <div class="space-y-6">
-                <input id="modal-input" type="text" placeholder="הקלידו תשובה..." autocomplete="off" class="w-full bg-[#0b1120] border-2 border-slate-700 focus:border-cyan-500 rounded-xl px-6 py-4 text-center text-2xl theme-font text-cyan-300 font-bold outline-none">
-                <div id="modal-feedback" class="hidden font-bold py-2 rounded-lg text-sm theme-font tracking-wider"></div>
+                <input id="modal-input" type="text" placeholder="..." autocomplete="off" class="w-full bg-[#0b1120] border-2 border-slate-700 focus:border-cyan-500 rounded-xl px-6 py-4 text-center text-2xl theme-font text-cyan-300 font-bold outline-none">
+                <div id="modal-feedback" class="hidden font-bold py-2 rounded-lg text-sm theme-font"></div>
                 <div class="flex gap-4">
                     <button onclick="checkAnswer()" class="flex-1 bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-4 rounded-xl transition shadow-lg text-lg uppercase">אימות</button>
                     <button onclick="closeModal()" class="px-6 bg-slate-800 text-slate-400 rounded-xl border border-slate-700"><i class="fas fa-times"></i></button>
@@ -215,32 +233,25 @@
 
     <!-- מסך ניצחון -->
     <div id="screen-victory" class="hidden fixed inset-0 bg-[#0b1120] z-[200] flex flex-col items-center justify-center text-center p-8 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 to-[#0b1120]">
-        <div class="relative mb-10"><i class="fas fa-check text-9xl text-cyan-400 drop-shadow-[0_0_25px_rgba(6,182,212,0.8)]"></i></div>
+        <div class="relative mb-10 text-center"><i class="fas fa-check text-9xl text-cyan-400 drop-shadow-[0_0_25px_rgba(6,182,212,0.8)]"></i></div>
         <h1 class="theme-font text-7xl font-bold text-cyan-400 mb-6 uppercase tracking-widest">יצאתם לחופשי! 🏆</h1>
-        <p class="text-xl text-slate-400 mb-12 max-w-lg mx-auto">כל הכבוד, פיצחתם את כל החידות בהצלחה!</p>
-        <div class="flex gap-4 justify-center">
-            <button onclick="location.reload()" class="bg-transparent border-2 border-cyan-600 text-cyan-400 px-10 py-3 rounded-full font-bold text-lg hover:bg-cyan-900/30 transition">חזרה להתחלה</button>
-            <button id="btn-victory-back-edit" onclick="returnToEditor()" class="hidden bg-indigo-600 text-white px-10 py-3 rounded-full font-bold text-lg shadow-lg transition">חזרה לעריכה</button>
-        </div>
+        <button onclick="location.reload()" class="bg-transparent border-2 border-cyan-600 text-cyan-400 px-10 py-3 rounded-full font-bold text-lg hover:bg-cyan-900/30 transition">חזרה למסך הבית</button>
     </div>
 
-    <footer class="p-2 bg-slate-950/90 border-t border-slate-900 flex flex-col items-center shrink-0 z-50 text-center">
-        <p class="text-[10px] text-slate-500 theme-font tracking-wide">אריאל קלפנר, טכנופדגוגיה ובינה מלאכותית</p>
-    </footer>
-
     <script>
-        let userRole = null; 
         let levels = [];
         let currentLevelIndex = 0;
         let isDragging = false;
         let dragStart = { x: 0, y: 0 };
+        let userRole = null;
 
         const screens = {
             intro: document.getElementById('screen-intro'),
             teacher: document.getElementById('screen-teacher'),
             student: document.getElementById('screen-student'),
             victory: document.getElementById('screen-victory'),
-            modal: document.getElementById('modal-lock')
+            modal: document.getElementById('modal-lock'),
+            loading: document.getElementById('loading-screen')
         };
 
         const teacherDOM = {
@@ -250,10 +261,14 @@
             hotspot: document.getElementById('teacher-hotspot'),
             inputQ: document.getElementById('teacher-input-question'),
             inputA: document.getElementById('teacher-input-answer'),
-            inputUrl: document.getElementById('teacher-input-url'),
             editPanel: document.getElementById('teacher-edit-panel'),
             navMsg: document.getElementById('teacher-nav-msg'),
-            navText: document.getElementById('nav-msg-text')
+            navText: document.getElementById('nav-msg-text'),
+            typeBtns: {
+                intro: document.getElementById('type-btn-intro'),
+                puzzle: document.getElementById('type-btn-puzzle'),
+                end: document.getElementById('type-btn-end')
+            }
         };
 
         const studentDOM = {
@@ -266,28 +281,254 @@
             modalFeedback: document.getElementById('modal-feedback')
         };
 
-        // פונקציית קסם למעבר מקישור דרייב לתמונה ישירה
-        function formatDriveLink(url) {
-            if (!url) return '';
-            if (url.includes('drive.google.com')) {
-                // חילוץ ה-ID של הקובץ מהקישור
-                const match = url.match(/\/d\/(.+?)\/(view|edit|usp)/) || url.match(/id=(.+?)(&|$)/);
-                if (match && match[1]) {
-                    return `https://lh3.googleusercontent.com/u/0/d/${match[1]}`;
+        function showLoading(show, text = "טוען...") {
+            document.getElementById('loading-text').innerText = text;
+            screens.loading.classList.toggle('hidden', !show);
+        }
+
+        async function saveToCloud() {
+            if (levels.length === 0) return;
+            if (!window.auth.currentUser) {
+                alert("מערכת האימות עדיין נטענת. נסה שוב בעוד רגע.");
+                return;
+            }
+
+            showLoading(true, "שומר נתונים בענן (זה עשוי לקחת מספר שניות)...");
+            try {
+                const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+                const { doc, setDoc } = window.firestoreFuncs;
+                
+                const levelsWithoutImages = [];
+                const chunks = [];
+                const CHUNK_SIZE = 800000; // חלוקה למנות קטנות מ-1MB כדי למנוע קריסה
+
+                for (let i = 0; i < levels.length; i++) {
+                    const lvl = levels[i];
+                    const lvlCopy = { ...lvl, image: '' };
+                    levelsWithoutImages.push(lvlCopy);
+                    
+                    if (lvl.image) {
+                        const numChunks = Math.ceil(lvl.image.length / CHUNK_SIZE);
+                        lvlCopy.imageChunks = numChunks;
+                        
+                        for (let c = 0; c < numChunks; c++) {
+                            chunks.push({
+                                levelIdx: i,
+                                chunkIdx: c,
+                                data: lvl.image.substring(c * CHUNK_SIZE, (c + 1) * CHUNK_SIZE)
+                            });
+                        }
+                    } else {
+                        lvlCopy.imageChunks = 0;
+                    }
+                }
+
+                // 1. שמירת חלקי ה-GIF
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunkRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'room_chunks', `${roomCode}_${chunks[i].levelIdx}_${chunks[i].chunkIdx}`);
+                    await setDoc(chunkRef, { data: chunks[i].data });
+                }
+
+                // 2. שמירת המבנה הראשי של החדר
+                const roomRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'rooms', roomCode);
+                await setDoc(roomRef, {
+                    levels: levelsWithoutImages,
+                    updatedAt: Date.now(),
+                    owner: window.auth.currentUser.uid
+                });
+
+                document.getElementById('display-room-code').innerText = roomCode;
+                document.getElementById('modal-code').classList.remove('hidden');
+            } catch (e) {
+                console.error(e);
+                alert("שגיאה בשמירה בענן: נא לוודא שהחיבור לאינטרנט יציב.");
+            }
+            showLoading(false);
+        }
+
+        async function fetchRoomData(code) {
+            const { doc, getDoc } = window.firestoreFuncs;
+            const roomRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'rooms', code);
+            const snap = await getDoc(roomRef);
+            if (!snap.exists()) return null;
+            
+            const data = snap.data();
+            const loadedLevels = data.levels;
+            
+            // שחזור התמונות מהחלקים שנשמרו בענן
+            for (let i = 0; i < loadedLevels.length; i++) {
+                const lvl = loadedLevels[i];
+                if (lvl.imageChunks > 0) {
+                    let fullImage = '';
+                    for (let c = 0; c < lvl.imageChunks; c++) {
+                        const chunkRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'room_chunks', `${code}_${i}_${c}`);
+                        const chunkSnap = await getDoc(chunkRef);
+                        if (chunkSnap.exists()) {
+                            fullImage += chunkSnap.data().data;
+                        }
+                    }
+                    lvl.image = fullImage;
                 }
             }
-            return url;
+            return loadedLevels;
+        }
+
+        async function loadRoomFromCloud() {
+            const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+            if (!code) return;
+            showLoading(true, "טוען חדר (טעינת GIF יכולה לקחת מעט זמן)...");
+            try {
+                const loadedLevels = await fetchRoomData(code);
+                if (loadedLevels) {
+                    levels = loadedLevels;
+                    currentLevelIndex = 0;
+                    userRole = 'STUDENT';
+                    showScreen('student');
+                    renderStudentUI();
+                } else {
+                    alert("קוד חדר לא תקין או לא נמצא.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("תקלת תקשורת מול הענן.");
+            }
+            showLoading(false);
+        }
+
+        async function loadRoomForEdit() {
+            const code = document.getElementById('input-edit-code').value.trim().toUpperCase();
+            if (!code) return;
+            showLoading(true, "טוען חדר לעריכה...");
+            try {
+                const loadedLevels = await fetchRoomData(code);
+                if (loadedLevels) {
+                    levels = loadedLevels;
+                    currentLevelIndex = 0;
+                    userRole = 'TEACHER';
+                    showScreen('teacher');
+                    renderTeacherUI();
+                } else {
+                    alert("חדר לא נמצא.");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("תקלת תקשורת מול הענן.");
+            }
+            showLoading(false);
         }
 
         function showScreen(screenName) {
-            Object.values(screens).forEach(s => { if (s) s.classList.add('hidden'); });
+            Object.values(screens).forEach(s => { if (s && s !== screens.loading) s.classList.add('hidden'); });
             if (screens[screenName]) screens[screenName].classList.remove('hidden');
+        }
+
+        async function processFile(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleNewGame(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            showLoading(true, "מעבד GIF...");
+            userRole = 'TEACHER';
+            levels = [];
+            const imgData = await processFile(file);
+            levels.push({
+                id: Date.now(),
+                image: imgData,
+                type: 'puzzle',
+                question: 'מהו הקוד?',
+                answer: '',
+                hotspot: { x: 40, y: 40, width: 20, height: 20 }
+            });
+            currentLevelIndex = 0;
+            showScreen('teacher');
+            renderTeacherUI();
+            showLoading(false);
+        }
+
+        async function addLevelFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            showLoading(true, "מוסיף שלב...");
+            const imgData = await processFile(file);
+            const newLevel = {
+                id: Date.now(),
+                image: imgData,
+                type: 'puzzle',
+                question: 'מהו הקוד?',
+                answer: '',
+                hotspot: { x: 40, y: 40, width: 20, height: 20 }
+            };
+            levels.splice(currentLevelIndex + 1, 0, newLevel);
+            currentLevelIndex++;
+            renderTeacherUI();
+            showLoading(false);
+        }
+
+        async function replaceImageFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            showLoading(true, "מחליף תמונה...");
+            const imgData = await processFile(file);
+            levels[currentLevelIndex].image = imgData;
+            renderTeacherUI();
+            showLoading(false);
         }
 
         function setLevelType(type) {
             if (!levels[currentLevelIndex]) return;
             levels[currentLevelIndex].type = type;
             renderTeacherUI();
+        }
+
+        function renderTeacherUI() {
+            if (levels.length === 0) {
+                teacherDOM.mainContent.style.visibility = 'hidden';
+                teacherDOM.sidebar.innerHTML = '<p class="text-slate-500 text-center text-sm mt-10">אין שלבים</p>';
+                return;
+            }
+            teacherDOM.mainContent.style.visibility = 'visible';
+            
+            // רינדור הסיידבר
+            teacherDOM.sidebar.innerHTML = '';
+            levels.forEach((lvl, idx) => {
+                const div = document.createElement('div');
+                div.className = `group relative p-2 rounded-xl border border-slate-700 cursor-pointer transition-all ${currentLevelIndex === idx ? 'active-level' : 'bg-slate-800'}`;
+                div.onclick = () => { currentLevelIndex = idx; renderTeacherUI(); };
+                div.innerHTML = `
+                    <div class="w-full h-16 bg-center bg-cover bg-no-repeat rounded-md mb-1 bg-black" style="background-image: url('${lvl.image.substring(0, 1000)}')"></div>
+                    <div class="text-[10px] font-bold text-center uppercase">שלב ${idx + 1}</div>
+                    <button onclick="event.stopPropagation(); removeLevel(${idx})" class="absolute top-2 left-2 bg-red-600/80 p-1.5 rounded opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-xs text-white"></i></button>`;
+                teacherDOM.sidebar.appendChild(div);
+            });
+
+            const current = levels[currentLevelIndex];
+            if (teacherDOM.img.src !== current.image) teacherDOM.img.src = current.image;
+            
+            // עדכון כפתורי הסוג
+            Object.keys(teacherDOM.typeBtns).forEach(key => {
+                if(teacherDOM.typeBtns[key]) teacherDOM.typeBtns[key].classList.remove('active');
+            });
+            const currentType = current.type || 'puzzle';
+            if (teacherDOM.typeBtns[currentType]) teacherDOM.typeBtns[currentType].classList.add('active');
+
+            updateHotspotVisual(teacherDOM.hotspot, current.hotspot);
+
+            if (currentType === 'puzzle') {
+                teacherDOM.editPanel.classList.remove('hidden');
+                teacherDOM.navMsg.classList.add('hidden');
+                teacherDOM.inputQ.value = current.question || "";
+                teacherDOM.inputA.value = current.answer || "";
+            } else {
+                teacherDOM.editPanel.classList.add('hidden');
+                teacherDOM.navMsg.classList.remove('hidden');
+                teacherDOM.navText.innerHTML = currentType === 'intro' ? "תמונת פתיחה - סמנו אזור שקוף למעבר" : "תמונת סיום - סמנו אזור שקוף לסגירה";
+            }
         }
 
         function handleImageClick() {
@@ -305,125 +546,11 @@
             studentDOM.modalQ.innerText = current.question || "מהו הקוד?";
             studentDOM.modalInput.value = "";
             studentDOM.modalFeedback.className = 'hidden';
-            if (screens.modal) screens.modal.classList.remove('hidden');
-            setTimeout(() => { if (studentDOM.modalInput) studentDOM.modalInput.focus(); }, 100);
+            showScreen('modal');
+            setTimeout(() => studentDOM.modalInput.focus(), 100);
         }
 
-        function closeModal() { if (screens.modal) screens.modal.classList.add('hidden'); }
-
-        function previewGame() {
-            if (levels.length === 0) return;
-            currentLevelIndex = 0;
-            document.getElementById('btn-back-to-edit').classList.remove('hidden');
-            document.getElementById('btn-victory-back-edit').classList.remove('hidden');
-            renderStudentUI();
-            showScreen('student');
-        }
-
-        function returnToEditor() { showScreen('teacher'); renderTeacherUI(); }
-
-        function createNewGame() {
-            userRole = 'TEACHER';
-            levels = [];
-            currentLevelIndex = 0;
-            addNewLevelPrompt();
-            showScreen('teacher');
-        }
-
-        function handleLoadGame(event, role) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    let data = JSON.parse(e.target.result);
-                    levels = Array.isArray(data) ? data : (data.levels || []);
-                    currentLevelIndex = 0;
-                    userRole = role;
-                    if(role === 'TEACHER') { showScreen('teacher'); renderTeacherUI(); }
-                    else { showScreen('student'); renderStudentUI(); }
-                } catch (err) { alert("קובץ לא תקין."); }
-            };
-            reader.readAsText(file);
-        }
-
-        function updateImageFromUrl() {
-            const url = teacherDOM.inputUrl.value.trim();
-            if (!url || !levels[currentLevelIndex]) return;
-            levels[currentLevelIndex].image = formatDriveLink(url);
-            renderTeacherUI();
-        }
-
-        function addNewLevelPrompt() {
-            const newLevel = {
-                id: Date.now(),
-                image: '', 
-                type: 'puzzle', 
-                question: 'מהו הקוד למנעול?',
-                answer: '',
-                hotspot: { x: 40, y: 40, width: 20, height: 20 }
-            };
-            if (levels.length === 0) { levels.push(newLevel); currentLevelIndex = 0; }
-            else { levels.splice(currentLevelIndex + 1, 0, newLevel); currentLevelIndex++; }
-            renderTeacherUI();
-        }
-
-        function renderTeacherUI() {
-            if (levels.length === 0) {
-                teacherDOM.mainContent.style.visibility = 'hidden';
-                teacherDOM.sidebar.innerHTML = '<p class="text-slate-500 text-center text-sm mt-10">אין שלבים</p>';
-                return;
-            }
-            teacherDOM.mainContent.style.visibility = 'visible';
-            
-            teacherDOM.sidebar.innerHTML = '';
-            levels.forEach((lvl, idx) => {
-                const div = document.createElement('div');
-                div.className = `group relative p-2 rounded-xl border border-slate-700 cursor-pointer transition-all ${currentLevelIndex === idx ? 'active-level' : 'bg-slate-800'}`;
-                div.onclick = () => { currentLevelIndex = idx; renderTeacherUI(); };
-                div.innerHTML = `
-                    <div class="w-full h-16 bg-center bg-cover bg-no-repeat rounded-md mb-1 bg-black" style="background-image: url('${lvl.image}')"></div>
-                    <div class="text-[10px] font-bold text-center uppercase">שלב ${idx + 1}</div>
-                    <button onclick="event.stopPropagation(); removeLevel(${idx})" class="absolute top-2 left-2 bg-red-600/80 p-1.5 rounded opacity-0 group-hover:opacity-100 transition"><i class="fas fa-trash text-xs text-white"></i></button>`;
-                teacherDOM.sidebar.appendChild(div);
-            });
-
-            const current = levels[currentLevelIndex];
-            teacherDOM.img.src = current.image || 'https://placehold.co/600x400/0b1120/06b6d4?text=Paste+Link+Above';
-            teacherDOM.inputUrl.value = current.image;
-            
-            document.querySelectorAll('.type-pill').forEach(p => p.classList.remove('active'));
-            const activePill = document.getElementById(`type-${current.type}`);
-            if (activePill) activePill.classList.add('active');
-
-            updateHotspotVisual(teacherDOM.hotspot, current.hotspot);
-
-            if (current.type === 'puzzle') {
-                teacherDOM.editPanel.classList.remove('hidden');
-                teacherDOM.navMsg.classList.add('hidden');
-                teacherDOM.inputQ.value = current.question || "";
-                teacherDOM.inputA.value = current.answer || "";
-            } else {
-                teacherDOM.editPanel.classList.add('hidden');
-                teacherDOM.navMsg.classList.remove('hidden');
-                teacherDOM.navText.innerHTML = current.type === 'intro' ? "תמונת פתיחה - סמנו אזור שקוף למעבר" : "תמונת סיום - סמנו אזור שקוף לסגירה";
-            }
-        }
-
-        function removeLevel(index) {
-            levels.splice(index, 1);
-            if (currentLevelIndex >= levels.length && levels.length > 0) currentLevelIndex = levels.length - 1;
-            renderTeacherUI();
-        }
-
-        function saveProjectFile() {
-            if (levels.length === 0) return;
-            const blob = new Blob([JSON.stringify(levels)], { type: 'application/json' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'escape-room-cloud.json';
-            link.click();
-        }
+        function closeModal() { showScreen('student'); }
 
         function renderStudentUI() {
             const current = levels[currentLevelIndex];
@@ -431,8 +558,8 @@
             const puzzleCount = levels.filter(l => l.type === 'puzzle').length;
             const currentPuzzleIdx = levels.slice(0, currentLevelIndex + 1).filter(l => l.type === 'puzzle').length;
 
-            studentDOM.progress.innerText = current.type === 'puzzle' ? `חידה ${currentPuzzleIdx} / ${puzzleCount}` : (current.type === 'intro' ? 'פתיחה' : 'סיום');
-            studentDOM.hint.innerText = current.type === 'puzzle' ? "מצאו את המנעול בתוך ה-GIF" : "לחצו על האזור השקוף להמשך";
+            studentDOM.progress.innerText = (current.type === 'puzzle') ? `חידה ${currentPuzzleIdx} / ${puzzleCount}` : (current.type === 'intro' ? 'פתיחה' : 'סיום');
+            studentDOM.hint.innerText = (current.type === 'puzzle') ? "מצאו את המנעול בתוך ה-GIF ולחצו עליו" : "לחצו על האזור השקוף להמשך";
             
             studentDOM.img.src = current.image;
             updateHotspotVisual(studentDOM.hotspot, current.hotspot);
@@ -476,8 +603,8 @@
             const correct = (current.answer || "").trim().toLowerCase();
             const fb = studentDOM.modalFeedback;
             if (input === correct || (correct.length > 2 && input.includes(correct))) {
-                fb.innerText = "נכון!";
-                fb.className = "mt-2 text-green-400 block";
+                fb.innerText = "נכון! המנעול נפתח.";
+                fb.className = "mt-2 text-green-400 block font-bold";
                 fb.classList.remove('hidden');
                 setTimeout(() => { 
                     closeModal(); 
@@ -485,16 +612,39 @@
                     else showScreen('victory');
                 }, 1000);
             } else {
-                fb.innerText = "לא נכון!";
-                fb.className = "mt-2 text-red-400 block animate-shake";
+                fb.innerText = "לא נכון. נסו שוב!";
+                fb.className = "mt-2 text-red-400 block font-bold animate-shake";
                 fb.classList.remove('hidden');
-                setTimeout(() => fb.classList.add('hidden'), 1000);
+                studentDOM.modalInput.classList.add('animate-shake');
+                setTimeout(() => studentDOM.modalInput.classList.remove('animate-shake'), 500);
             }
         }
 
+        function removeLevel(index) {
+            levels.splice(index, 1);
+            if (currentLevelIndex >= levels.length && levels.length > 0) currentLevelIndex = levels.length - 1;
+            renderTeacherUI();
+        }
+
+        function previewGame() {
+            if (levels.length === 0) return;
+            const oldIdx = currentLevelIndex;
+            currentLevelIndex = 0;
+            document.getElementById('btn-back-to-edit').classList.remove('hidden');
+            renderStudentUI();
+            showScreen('student');
+            window._oldIdx = oldIdx;
+        }
+
+        function returnToEditor() { 
+            currentLevelIndex = window._oldIdx || 0;
+            showScreen('teacher'); 
+            renderTeacherUI(); 
+        }
+
         window.onmouseup = () => isDragging = false;
-        teacherDOM.inputQ.oninput = (e) => levels[currentLevelIndex].question = e.target.value;
-        teacherDOM.inputA.oninput = (e) => levels[currentLevelIndex].answer = e.target.value;
+        teacherDOM.inputQ.oninput = (e) => { if(levels[currentLevelIndex]) levels[currentLevelIndex].question = e.target.value; };
+        teacherDOM.inputA.oninput = (e) => { if(levels[currentLevelIndex]) levels[currentLevelIndex].answer = e.target.value; };
         studentDOM.modalInput.onkeypress = (e) => { if (e.key === 'Enter') checkAnswer(); };
     </script>
 </body>
